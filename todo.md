@@ -1,0 +1,93 @@
+# TODO
+
+- [ ] 克隆或同步 `totem_mobile` 源码，并确认 Android Studio 能成功打开项目。
+- [ ] 确认 Gradle 同步成功，Android SDK API 35 或更高版本已安装。
+- [ ] 创建并启动 Android 模拟器，或连接可调试的 Android 真机。
+- [ ] 在模拟器或真机上运行原始 Totem 应用，确认 `MainActivity.java` 的 SQL 输入和结果展示可用。
+- [ ] 阅读 `edu/whu/tmdb/query/operations/impl/CreateDeputyClassImpl.java`，定位 SelectDeputy 和 GroupDeputy 创建逻辑。
+- [ ] 阅读 `InsertImpl.java`，定位源类插入、代理类传播和双向指针创建逻辑。
+- [ ] 阅读 `DeleteImpl.java`，定位源元组删除和代理元组同步删除逻辑。
+- [ ] 阅读 `UpdateImpl.java`，定位源元组更新和代理元组同步更新逻辑。
+- [ ] 阅读 `SelectImpl.java`，定位 `WHERE`、`GROUP BY`、`ORDER BY`、聚合函数的执行顺序。
+- [ ] 阅读 `Having.java` 或相关解析对象，确认当前 `HAVING` 子句的表示方式。
+- [ ] 为 SelectDeputy 增加严格模式与非严格模式的区分字段或可推导标记。
+- [ ] 在创建 SelectDeputy 时判断 `SELECT` 是否包含 `WHERE` 子句。
+- [ ] 当 SelectDeputy 不包含 `WHERE` 时，将其识别为非严格 SelectDeputy。
+- [ ] 创建非严格 SelectDeputy 时只建立类定义、属性映射和系统表信息，不导入源类历史数据。
+- [ ] 创建严格 SelectDeputy 时保持原有 `WHERE` 规则驱动行为不变。
+- [ ] 扩展 `INSERT INTO sourceClass VALUES (...) INTO deputyClass` 的语法解析或执行入口。
+- [ ] 在插入执行阶段读取可选的 `INTO deputyClass` 目标。
+- [ ] 校验 `deputyClass` 必须存在。
+- [ ] 校验 `deputyClass` 必须是当前源类的 SelectDeputy。
+- [ ] 校验 `deputyClass` 必须是非严格 SelectDeputy。
+- [ ] 当 `INTO deputyClass` 指向严格 SelectDeputy 时返回明确错误。
+- [ ] 当 `INTO deputyClass` 指向非同源代理类时返回明确错误。
+- [ ] 当 `INSERT` 未指定 `INTO deputyClass` 时，只插入源类，不传播到非严格 SelectDeputy。
+- [ ] 当 `INSERT` 指定合法非严格代理类时，先插入源类元组。
+- [ ] 根据 `SwitchingTable` 将源类属性映射为代理类属性值。
+- [ ] 将映射后的元组插入指定非严格 SelectDeputy。
+- [ ] 为源元组和代理元组创建双向指针记录。
+- [ ] 确认同一个源元组显式插入代理类后，可以通过代理类查询到。
+- [ ] 确认未显式指定代理类的源元组不会出现在非严格代理类中。
+- [ ] 删除源元组时，查找该源元组关联的非严格 SelectDeputy 双向指针。
+- [ ] 删除源元组时，同步删除关联的非严格代理元组。
+- [ ] 删除未关联非严格代理类的源元组时，不影响非严格代理类已有数据。
+- [ ] 更新源元组时，查找该源元组关联的非严格 SelectDeputy 双向指针。
+- [ ] 更新源元组时，按属性映射同步更新关联代理元组。
+- [ ] 更新未关联非严格代理类的源元组时，不影响非严格代理类已有数据。
+- [ ] 编写任务一 SQL 用例：非严格 SelectDeputy 初始为空。
+- [ ] 编写任务一 SQL 用例：显式 `INTO` 后代理类出现对应元组。
+- [ ] 编写任务一 SQL 用例：未显式 `INTO` 的元组不进入代理类。
+- [ ] 编写任务一 SQL 用例：严格 SelectDeputy 使用 `INTO` 报错。
+- [ ] 编写任务一 SQL 用例：非同源类使用 `INTO` 报错。
+- [ ] 编写任务一 SQL 用例：删除关联源元组后代理元组消失。
+- [ ] 编写任务一 SQL 用例：更新关联源元组后代理属性同步变化。
+- [ ] 为普通 `SELECT` 查询补全 `HAVING` 条件解析接入。
+- [ ] 明确 `HAVING` 表达式中聚合函数、别名、比较运算符的支持范围。
+- [ ] 在 `SELECT` 执行流程中，将 `HAVING` 过滤放在 `GROUP BY` 聚合之后。
+- [ ] 在 `SELECT` 执行流程中，将 `HAVING` 过滤放在 `ORDER BY` 排序之前。
+- [ ] 实现 `AVG`、`COUNT`、`SUM`、`MIN`、`MAX` 聚合结果在 `HAVING` 表达式中的取值。
+- [ ] 支持 `HAVING AVG(column) > number` 这类任务书基础示例。
+- [ ] 支持 `HAVING AVG(column) >= number` 这类边界比较。
+- [ ] 支持 `HAVING COUNT(*) > number` 这类常见聚合比较。
+- [ ] 对暂不支持的复杂 `HAVING` 表达式返回明确错误。
+- [ ] 创建 GroupDeputy 时，复用或调用普通 `SELECT` 的 `HAVING` 过滤逻辑。
+- [ ] 创建 GroupDeputy 时，只为满足 `HAVING` 的分组创建代理元组。
+- [ ] 创建 GroupDeputy 时，只为满足 `HAVING` 的分组创建 `BiPointer`。
+- [ ] 创建 GroupDeputy 时，确认被过滤分组不会出现在代理类查询结果中。
+- [ ] 源类 `INSERT` 后，重新计算受影响分组的聚合结果。
+- [ ] 源类 `INSERT` 后，如果分组仍满足 `HAVING`，更新代理元组聚合值。
+- [ ] 源类 `INSERT` 后，如果分组由不满足变为满足 `HAVING`，新建代理元组。
+- [ ] 源类 `INSERT` 后，如果分组仍不满足 `HAVING`，不创建代理元组。
+- [ ] 源类 `DELETE` 后，重新计算受影响分组的聚合结果。
+- [ ] 源类 `DELETE` 后，如果分组仍满足 `HAVING`，更新代理元组聚合值。
+- [ ] 源类 `DELETE` 后，如果分组由满足变为不满足 `HAVING`，删除代理元组。
+- [ ] 源类 `DELETE` 后，如果分组已无源元组，删除对应代理元组和指针。
+- [ ] 源类 `UPDATE` 后，重新计算旧分组和新分组的聚合结果。
+- [ ] 源类 `UPDATE` 后，如果分组键未改变但聚合值改变，按 `HAVING` 决定更新或删除代理元组。
+- [ ] 源类 `UPDATE` 后，如果分组键改变，分别处理旧分组删除或更新、新分组创建或更新。
+- [ ] 源类 `UPDATE` 后，如果分组由不满足变为满足 `HAVING`，新建代理元组。
+- [ ] 源类 `UPDATE` 后，如果分组由满足变为不满足 `HAVING`，删除代理元组。
+- [ ] 维护 GroupDeputy 更新迁移中的 `BiPointer` 创建、更新和删除。
+- [ ] 编写任务二 SQL 用例：普通 `SELECT ... GROUP BY ... HAVING` 过滤 Sales 分组。
+- [ ] 编写任务二 SQL 用例：创建 GroupDeputy 时过滤不满足条件的分组。
+- [ ] 编写任务二 SQL 用例：插入后已有分组聚合值更新。
+- [ ] 编写任务二 SQL 用例：插入后原不满足分组变为满足并新建代理元组。
+- [ ] 编写任务二 SQL 用例：删除后仍满足条件的分组聚合值更新。
+- [ ] 编写任务二 SQL 用例：删除后不再满足条件的分组代理元组被删除。
+- [ ] 编写任务二 SQL 用例：更新后仍满足条件的分组聚合值更新。
+- [ ] 编写任务二 SQL 用例：更新后不再满足条件的分组代理元组被删除。
+- [ ] 编写任务二 SQL 用例：更新后重新满足条件的分组代理元组被创建。
+- [ ] 在 Android 前端依次执行任务一全部 SQL 示例并记录结果。
+- [ ] 在 Android 前端依次执行任务二全部 SQL 示例并记录结果。
+- [ ] 检查错误场景提示是否清晰，避免静默失败。
+- [ ] 检查严格 SelectDeputy 的原有示例是否仍然通过。
+- [ ] 检查普通 `GROUP BY` 查询在无 `HAVING` 时行为是否保持不变。
+- [ ] 检查 GroupDeputy 在无 `HAVING` 时行为是否保持不变。
+- [ ] 整理实验报告中的任务一设计思路。
+- [ ] 整理实验报告中的任务二设计思路。
+- [ ] 摘录或截图关键代码，说明修改文件和核心逻辑。
+- [ ] 记录 AI 工具使用情况、使用方式和大致比例。
+- [ ] 补充 Android 演示截图或关键查询结果截图。
+- [ ] 最终确认项目可编译、可安装、可演示。
+- [ ] 提交完整源代码到指定平台。
