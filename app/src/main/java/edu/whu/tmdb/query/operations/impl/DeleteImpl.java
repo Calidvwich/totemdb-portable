@@ -136,8 +136,8 @@ public class DeleteImpl implements Delete {
             for (BiPointerTableItem biPointerTableItem : biPointerTableList) {
                 if (biPointerTableItem.objectid == tupleId) {
                     // 将group代理的单独列出
-                    if (getdeputyrule(biPointerTableItem.deputyid, 1) == "groupdeputy") {
-                        groupDeputyTupleIdSet.add(biPointerTableItem.deputyobjectid);
+                    if ("groupdeputy".equals(getdeputyrule(biPointerTableItem.deputyid, 1))) {
+                        continue;
                     }
                     else {
                         deputyTupleIdSet.add(biPointerTableItem.deputyobjectid);
@@ -154,7 +154,7 @@ public class DeleteImpl implements Delete {
             Iterator<BiPointerTableItem> iterator = MemConnect.getBiPointerTableList().iterator();
             while (iterator.hasNext()) {
                 BiPointerTableItem biPointerTableItem = iterator.next();
-                if(getdeputyrule(biPointerTableItem.deputyid,1)=="joindeputy" ){
+                if ("joindeputy".equals(getdeputyrule(biPointerTableItem.deputyid, 1))) {
                     if (biPointerTableItem.objectid == tupleId||biPointerTableItem.deputyobjectid == tupleId) { 
                         iterator.remove();
                     }
@@ -246,6 +246,7 @@ public class DeleteImpl implements Delete {
             }
             delete(deputyTupleList, colName);
         }
+        new GroupDeputySynchronizer().synchronizeForSource(classId);
     }
     
     /*

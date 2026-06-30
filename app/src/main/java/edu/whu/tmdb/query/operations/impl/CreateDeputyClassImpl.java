@@ -9,8 +9,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import edu.whu.tmdb.query.operations.CreateDeputyClass;
@@ -27,11 +25,20 @@ import edu.whu.tmdb.storage.memory.SystemTable.ClassTableItem;
 import edu.whu.tmdb.storage.memory.SystemTable.DeputyRuleTableItem;
 import edu.whu.tmdb.storage.memory.SystemTable.DeputyTableItem;
 import edu.whu.tmdb.storage.memory.SystemTable.SwitchingTableItem;
+import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.Function;
+import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
+import net.sf.jsqlparser.statement.select.SelectExpressionItem;
+import net.sf.jsqlparser.statement.select.SelectItem;
 
 
 public class CreateDeputyClassImpl implements CreateDeputyClass {
+    public static final String SELECT_DEPUTY_STRICT_MODE = "strict";
+    public static final String SELECT_DEPUTY_NON_STRICT_MODE = "non_strict";
+
     private final MemConnect memConnect;
 
     public CreateDeputyClassImpl() { this.memConnect = MemConnect.getInstance(MemManager.getInstance()); }
@@ -56,6 +63,11 @@ public class CreateDeputyClassImpl implements CreateDeputyClass {
     }
 
     public boolean createDeputyClassStreamLine(SelectResult selectResult, int deputyType, String deputyClassName, Select selectStmt) throws TMDBException, IOException {
+        if (isNonStrictSelectDeputy(deputyType, selectStmt)) {
+            // Keep the projected schema and attribute mappings, but do not copy
+            // existing source tuples into a non-strict SelectDeputy.
+            selectResult.setTpl(new TupleList());
+        }
         int deputyId = createDeputyClass(deputyClassName, selectResult, deputyType);
         createDeputyTableItem(selectResult, deputyType, deputyId, selectStmt);
         createBiPointerTableItem(selectResult, deputyId,deputyType);
@@ -126,7 +138,12 @@ public class CreateDeputyClassImpl implements CreateDeputyClass {
         deputyrule[2] = "";
         
         switch (deputyType) {
-            case 0:   deputyrule[1] = "selectdeputy"; break;
+            case 0:
+                deputyrule[1] = "selectdeputy";
+                deputyrule[2] = isNonStrictSelectDeputy(deputyType, selectStmt)
+                    ? SELECT_DEPUTY_NON_STRICT_MODE
+                    : SELECT_DEPUTY_STRICT_MODE;
+                break;
             case 1:   deputyrule[1] = "joindeputy"; break;
             case 2:   deputyrule[1] = "uniondeputy"; break;
             case 3:   deputyrule[1] = "groupdeputy"; break;
@@ -193,22 +210,37 @@ public class CreateDeputyClassImpl implements CreateDeputyClass {
                 processedClassIds.add(originId);
             }
             int attrNum = selectResult.getClassName().length;
+            List<SelectItem> selectItems = ((PlainSelect) selectStmt.getSelectBody()).getSelectItems();
             for (int i = 0; i < attrNum; i++) {
-                String dptName = selectResult.getAttrname()[i], oriName = null, type = null;
+                String dptName = selectResult.getAttrname()[i];
+                String oriName;
+                String type;
+                Expression expression = ((SelectExpressionItem) selectItems.get(i)).getExpression();
 
                 // 正则表达式匹配聚合函数，比如 min(age)
-                String regex = "(?i)^(avg|min|max|count|sum)\\((\\w+)\\)$";
-                Pattern pattern = Pattern.compile(regex);
-                Matcher matcher = pattern.matcher(dptName);
+                Function function = expression instanceof Function ? (Function) expression : null;
 
-                if (matcher.find()) {
+                if (function != null) {
                     // 有聚合函数
-                    type = matcher.group(1).toLowerCase(); // 聚合类型
-                    oriName = matcher.group(2); // 原始字段名
+                    type = function.getName().toLowerCase(Locale.ROOT);
+                    boolean allColumns = function.isAllColumns()
+                        || (function.getParameters() != null
+                            && !function.getParameters().getExpressions().isEmpty()
+                            && "*".equals(function.getParameters().getExpressions().get(0).toString()));
+                    if (allColumns) {
+                        oriName = "*";
+                    } else {
+                        Expression parameter = function.getParameters().getExpressions().get(0);
+                        oriName = parameter instanceof Column
+                            ? ((Column) parameter).getColumnName()
+                            : parameter.toString();
+                    }
                 } else {
                     // 无聚合函数，默认 group
                     type = "groupdeputy";
-                    oriName = dptName;
+                    oriName = expression instanceof Column
+                        ? ((Column) expression).getColumnName()
+                        : expression.toString();
                 }
                  // 创建 SwitchingTableItem
                 SwitchingTableItem switchingTableItem = new SwitchingTableItem(
@@ -380,6 +412,14 @@ public class CreateDeputyClassImpl implements CreateDeputyClass {
         return -1;
     }
 
+    private boolean isNonStrictSelectDeputy(int deputyType, Select selectStmt) {
+        if (deputyType != 0 || !(selectStmt.getSelectBody() instanceof PlainSelect)) {
+            return false;
+        }
+        PlainSelect plainSelect = (PlainSelect) selectStmt.getSelectBody();
+        return plainSelect.getWhere() == null;
+    }
+
     
     /**
      * 给定查询语句，返回select查询执行结果（创建deputyclass后面的select语句中的selectResult）
@@ -402,8 +442,3 @@ public class CreateDeputyClassImpl implements CreateDeputyClass {
         return res;
     }
 }
-
-
-
-        
-            

@@ -126,20 +126,24 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
             Where where = new Where();
             selectResult = where.where(plainSelect, selectResult);
         }
+        if(plainSelect.getGroupBy() != null){
+            GroupBy groupBy = new GroupBy();
+            HashMap<Object, ArrayList<Tuple>> hashMap = groupBy.groupBy(plainSelect, selectResult);
+            selectResult = groupByElicit(plainSelect, hashMap, selectResult);
+            if (plainSelect.getHaving() != null) {
+                Having having = new Having();
+                selectResult = having.having(plainSelect, selectResult);
+            }
+        }
+        else {//然后通过selectItem提取想要的列
+            selectResult = projection(plainSelect, selectResult);
+        }
         if (plainSelect.getOrderByElements() != null) {
             OrderBy orderBy = new OrderBy();
             selectResult = orderBy.orderBy(plainSelect.getOrderByElements(), selectResult);
         }
         if (plainSelect.getLimit() != null){
             selectResult = limit(Integer.parseInt(plainSelect.getLimit().getRowCount().toString()), selectResult);
-        }
-        if(plainSelect.getGroupBy() != null){
-            GroupBy groupBy = new GroupBy();
-            HashMap<Object, ArrayList<Tuple>> hashMap = groupBy.groupBy(plainSelect, selectResult);
-            selectResult = groupByElicit(plainSelect, hashMap, selectResult);
-        }
-        else {//然后通过selectItem提取想要的列
-            selectResult = projection(plainSelect, selectResult);
         }
         //最终返回selectResult
         return selectResult;
@@ -164,20 +168,24 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
             Where where = new Where();
             selectResult = where.where(plainSelect, selectResult);
         }
+        if(plainSelect.getGroupBy() != null){
+            GroupBy groupBy = new GroupBy();
+            HashMap<Object, ArrayList<Tuple>> hashMap = groupBy.groupBy(plainSelect, selectResult);
+            selectResult = groupByElicit(plainSelect, hashMap, selectResult);
+            if (plainSelect.getHaving() != null) {
+                Having having = new Having();
+                selectResult = having.having(plainSelect, selectResult);
+            }
+        }
+        else {//然后通过selectItem提取想要的列
+            selectResult = projection(plainSelect, selectResult);
+        }
         if (plainSelect.getOrderByElements() != null) {
             OrderBy orderBy = new OrderBy();
             selectResult = orderBy.orderBy(plainSelect.getOrderByElements(), selectResult);
         }
         if (plainSelect.getLimit() != null){
             selectResult = limit(Integer.parseInt(plainSelect.getLimit().getRowCount().toString()), selectResult);
-        }
-        if(plainSelect.getGroupBy() != null){
-            GroupBy groupBy = new GroupBy();
-            HashMap<Object, ArrayList<Tuple>> hashMap = groupBy.groupBy(plainSelect, selectResult);
-            selectResult = groupByElicit(plainSelect, hashMap, selectResult);
-        }
-        else {//然后通过selectItem提取想要的列
-            selectResult = projection(plainSelect, selectResult);
         }
         //最终返回selectResult
         return selectResult;
@@ -252,36 +260,64 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
                 else{
                     Function func = (Function) selectItem.getExpression();
                     String funcName = func.getName();
-                    String p = func.getParameters().getExpressions().get(0).toString();
                     int pIndex=-1;
-                    for (int j = 0; j < selectResult.getAttrname().length; j++) {
-                        if(p.equals(selectResult.getAttrname()[j])
-                        || p.equals(selectResult.getAlias()[j])){
-                            pIndex=j;
+                    boolean countAll = "count".equalsIgnoreCase(funcName)
+                        && (func.isAllColumns()
+                            || (func.getParameters() != null
+                                && !func.getParameters().getExpressions().isEmpty()
+                                && "*".equals(func.getParameters().getExpressions().get(0).toString())));
+                    if (countAll) {
+                        for (ArrayList<Tuple> tuples : resultMap.values()) {
+                            thisColumn.add((double) tuples.size());
                         }
+                    } else {
+                        String p = func.getParameters().getExpressions().get(0).toString();
+                        for (int j = 0; j < selectResult.getAttrname().length; j++) {
+                            if(p.equals(selectResult.getAttrname()[j])
+                            || p.equals(selectResult.getAlias()[j])){
+                                pIndex=j;
+                            }
+                        }
+                        if(pIndex==-1){
+                            throw new TMDBException(/*2, p*/);
+                        }
+                        thisColumn=solveAggregationFunction(resultMap,funcName,pIndex);
                     }
-                    if(pIndex==-1){
-                        throw new TMDBException(/*2, p*/);
-                    }
-                    thisColumn=solveAggregationFunction(resultMap,funcName,pIndex);
                 }
                 int tempI=-1;
-                Column column = map.get(selectItem).get(0);
-                for (int j = 0; j < selectResult.getClassName().length; j++) {
-                    if(column.getTable()!=null){
-                        if((selectResult.getClassName()[j].equals(column.getTable().getName())
-                                || selectResult.getAlias()[j].equals(column.getTable().getName()))
-                                && selectResult.getAttrname()[j].equals(column.getColumnName())){
-                            tempI=j;
+                ArrayList<Column> itemColumns = map.get(selectItem);
+                if (!itemColumns.isEmpty()) {
+                    Column column = itemColumns.get(0);
+                    for (int j = 0; j < selectResult.getClassName().length; j++) {
+                        if(column.getTable()!=null){
+                            if((selectResult.getClassName()[j].equals(column.getTable().getName())
+                                    || selectResult.getAlias()[j].equals(column.getTable().getName()))
+                                    && selectResult.getAttrname()[j].equals(column.getColumnName())){
+                                tempI=j;
+                                break;
+                            }
+                        }
+                        else{
+                            if(selectResult.getAttrname()[j].equals(column.getColumnName())){
+                                tempI=j;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    for (int j = 0; j < selectResult.getAttrname().length; j++) {
+                        if (groupByElement.equals(selectResult.getAttrname()[j])
+                                || groupByElement.equals(selectResult.getAlias()[j])) {
+                            tempI = j;
                             break;
                         }
                     }
-                    else{
-                        if(selectResult.getAttrname()[j].equals(column.getColumnName())){
-                            tempI=j;
-                            break;
-                        }
+                    if (tempI == -1 && selectResult.getAttrname().length > 0) {
+                        tempI = 0;
                     }
+                }
+                if (tempI == -1) {
+                    throw new TMDBException();
                 }
 
                 for(int j=0;j<resTupleList.tuplelist.size();j++){
@@ -855,7 +891,7 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
                 for (int j = 0; j < expressionList1.getExpressions().size(); j++) {
                     Expression expr = expressionList1.getExpressions().get(j);
                     if (expr instanceof StringValue) {
-                        tuple[j] = ((StringValue) expr).getValue();
+                        tuple[j] = unescapeSqlString(((StringValue) expr).getValue());
                     } else {
                         tuple[j] = expr.toString();
                     }
@@ -866,7 +902,7 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
                 Expression expression = parenthesis.getExpression();
                 Object val;
                 if (expression instanceof StringValue) {
-                    val = ((StringValue) expression).getValue();
+                    val = unescapeSqlString(((StringValue) expression).getValue());
                 } else {
                     val = expression.toString();
                 }
@@ -881,6 +917,10 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
             attributeTableItemArrayList.add(attributeTableItem);
         }
         return getValueResult(attributeTableItemArrayList,tupleList);
+    }
+
+    private String unescapeSqlString(String value) {
+        return value == null ? null : value.replace("''", "'");
     }
 
     //join的核心方法

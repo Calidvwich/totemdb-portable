@@ -1,93 +1,172 @@
-# TODO
+# Totem 移动数据库实验 TODO
 
-- [ ] 克隆或同步 `totem_mobile` 源码，并确认 Android Studio 能成功打开项目。
-- [ ] 确认 Gradle 同步成功，Android SDK API 35 或更高版本已安装。
-- [ ] 创建并启动 Android 模拟器，或连接可调试的 Android 真机。
-- [ ] 在模拟器或真机上运行原始 Totem 应用，确认 `MainActivity.java` 的 SQL 输入和结果展示可用。
-- [ ] 阅读 `edu/whu/tmdb/query/operations/impl/CreateDeputyClassImpl.java`，定位 SelectDeputy 和 GroupDeputy 创建逻辑。
-- [ ] 阅读 `InsertImpl.java`，定位源类插入、代理类传播和双向指针创建逻辑。
-- [ ] 阅读 `DeleteImpl.java`，定位源元组删除和代理元组同步删除逻辑。
-- [ ] 阅读 `UpdateImpl.java`，定位源元组更新和代理元组同步更新逻辑。
-- [ ] 阅读 `SelectImpl.java`，定位 `WHERE`、`GROUP BY`、`ORDER BY`、聚合函数的执行顺序。
-- [ ] 阅读 `Having.java` 或相关解析对象，确认当前 `HAVING` 子句的表示方式。
-- [ ] 为 SelectDeputy 增加严格模式与非严格模式的区分字段或可推导标记。
-- [ ] 在创建 SelectDeputy 时判断 `SELECT` 是否包含 `WHERE` 子句。
-- [ ] 当 SelectDeputy 不包含 `WHERE` 时，将其识别为非严格 SelectDeputy。
-- [ ] 创建非严格 SelectDeputy 时只建立类定义、属性映射和系统表信息，不导入源类历史数据。
-- [ ] 创建严格 SelectDeputy 时保持原有 `WHERE` 规则驱动行为不变。
-- [ ] 扩展 `INSERT INTO sourceClass VALUES (...) INTO deputyClass` 的语法解析或执行入口。
-- [ ] 在插入执行阶段读取可选的 `INTO deputyClass` 目标。
-- [ ] 校验 `deputyClass` 必须存在。
-- [ ] 校验 `deputyClass` 必须是当前源类的 SelectDeputy。
-- [ ] 校验 `deputyClass` 必须是非严格 SelectDeputy。
-- [ ] 当 `INTO deputyClass` 指向严格 SelectDeputy 时返回明确错误。
-- [ ] 当 `INTO deputyClass` 指向非同源代理类时返回明确错误。
-- [ ] 当 `INSERT` 未指定 `INTO deputyClass` 时，只插入源类，不传播到非严格 SelectDeputy。
-- [ ] 当 `INSERT` 指定合法非严格代理类时，先插入源类元组。
-- [ ] 根据 `SwitchingTable` 将源类属性映射为代理类属性值。
-- [ ] 将映射后的元组插入指定非严格 SelectDeputy。
-- [ ] 为源元组和代理元组创建双向指针记录。
-- [ ] 确认同一个源元组显式插入代理类后，可以通过代理类查询到。
-- [ ] 确认未显式指定代理类的源元组不会出现在非严格代理类中。
-- [ ] 删除源元组时，查找该源元组关联的非严格 SelectDeputy 双向指针。
-- [ ] 删除源元组时，同步删除关联的非严格代理元组。
-- [ ] 删除未关联非严格代理类的源元组时，不影响非严格代理类已有数据。
-- [ ] 更新源元组时，查找该源元组关联的非严格 SelectDeputy 双向指针。
-- [ ] 更新源元组时，按属性映射同步更新关联代理元组。
-- [ ] 更新未关联非严格代理类的源元组时，不影响非严格代理类已有数据。
-- [ ] 编写任务一 SQL 用例：非严格 SelectDeputy 初始为空。
-- [ ] 编写任务一 SQL 用例：显式 `INTO` 后代理类出现对应元组。
-- [ ] 编写任务一 SQL 用例：未显式 `INTO` 的元组不进入代理类。
-- [ ] 编写任务一 SQL 用例：严格 SelectDeputy 使用 `INTO` 报错。
-- [ ] 编写任务一 SQL 用例：非同源类使用 `INTO` 报错。
-- [ ] 编写任务一 SQL 用例：删除关联源元组后代理元组消失。
-- [ ] 编写任务一 SQL 用例：更新关联源元组后代理属性同步变化。
-- [ ] 为普通 `SELECT` 查询补全 `HAVING` 条件解析接入。
-- [ ] 明确 `HAVING` 表达式中聚合函数、别名、比较运算符的支持范围。
-- [ ] 在 `SELECT` 执行流程中，将 `HAVING` 过滤放在 `GROUP BY` 聚合之后。
-- [ ] 在 `SELECT` 执行流程中，将 `HAVING` 过滤放在 `ORDER BY` 排序之前。
-- [ ] 实现 `AVG`、`COUNT`、`SUM`、`MIN`、`MAX` 聚合结果在 `HAVING` 表达式中的取值。
-- [ ] 支持 `HAVING AVG(column) > number` 这类任务书基础示例。
-- [ ] 支持 `HAVING AVG(column) >= number` 这类边界比较。
-- [ ] 支持 `HAVING COUNT(*) > number` 这类常见聚合比较。
-- [ ] 对暂不支持的复杂 `HAVING` 表达式返回明确错误。
-- [ ] 创建 GroupDeputy 时，复用或调用普通 `SELECT` 的 `HAVING` 过滤逻辑。
-- [ ] 创建 GroupDeputy 时，只为满足 `HAVING` 的分组创建代理元组。
-- [ ] 创建 GroupDeputy 时，只为满足 `HAVING` 的分组创建 `BiPointer`。
-- [ ] 创建 GroupDeputy 时，确认被过滤分组不会出现在代理类查询结果中。
-- [ ] 源类 `INSERT` 后，重新计算受影响分组的聚合结果。
-- [ ] 源类 `INSERT` 后，如果分组仍满足 `HAVING`，更新代理元组聚合值。
-- [ ] 源类 `INSERT` 后，如果分组由不满足变为满足 `HAVING`，新建代理元组。
-- [ ] 源类 `INSERT` 后，如果分组仍不满足 `HAVING`，不创建代理元组。
-- [ ] 源类 `DELETE` 后，重新计算受影响分组的聚合结果。
-- [ ] 源类 `DELETE` 后，如果分组仍满足 `HAVING`，更新代理元组聚合值。
-- [ ] 源类 `DELETE` 后，如果分组由满足变为不满足 `HAVING`，删除代理元组。
-- [ ] 源类 `DELETE` 后，如果分组已无源元组，删除对应代理元组和指针。
-- [ ] 源类 `UPDATE` 后，重新计算旧分组和新分组的聚合结果。
-- [ ] 源类 `UPDATE` 后，如果分组键未改变但聚合值改变，按 `HAVING` 决定更新或删除代理元组。
-- [ ] 源类 `UPDATE` 后，如果分组键改变，分别处理旧分组删除或更新、新分组创建或更新。
-- [ ] 源类 `UPDATE` 后，如果分组由不满足变为满足 `HAVING`，新建代理元组。
-- [ ] 源类 `UPDATE` 后，如果分组由满足变为不满足 `HAVING`，删除代理元组。
-- [ ] 维护 GroupDeputy 更新迁移中的 `BiPointer` 创建、更新和删除。
-- [ ] 编写任务二 SQL 用例：普通 `SELECT ... GROUP BY ... HAVING` 过滤 Sales 分组。
-- [ ] 编写任务二 SQL 用例：创建 GroupDeputy 时过滤不满足条件的分组。
-- [ ] 编写任务二 SQL 用例：插入后已有分组聚合值更新。
-- [ ] 编写任务二 SQL 用例：插入后原不满足分组变为满足并新建代理元组。
-- [ ] 编写任务二 SQL 用例：删除后仍满足条件的分组聚合值更新。
-- [ ] 编写任务二 SQL 用例：删除后不再满足条件的分组代理元组被删除。
-- [ ] 编写任务二 SQL 用例：更新后仍满足条件的分组聚合值更新。
-- [ ] 编写任务二 SQL 用例：更新后不再满足条件的分组代理元组被删除。
-- [ ] 编写任务二 SQL 用例：更新后重新满足条件的分组代理元组被创建。
-- [ ] 在 Android 前端依次执行任务一全部 SQL 示例并记录结果。
-- [ ] 在 Android 前端依次执行任务二全部 SQL 示例并记录结果。
-- [ ] 检查错误场景提示是否清晰，避免静默失败。
-- [ ] 检查严格 SelectDeputy 的原有示例是否仍然通过。
-- [ ] 检查普通 `GROUP BY` 查询在无 `HAVING` 时行为是否保持不变。
-- [ ] 检查 GroupDeputy 在无 `HAVING` 时行为是否保持不变。
-- [ ] 整理实验报告中的任务一设计思路。
-- [ ] 整理实验报告中的任务二设计思路。
-- [ ] 摘录或截图关键代码，说明修改文件和核心逻辑。
-- [ ] 记录 AI 工具使用情况、使用方式和大致比例。
-- [ ] 补充 Android 演示截图或关键查询结果截图。
-- [ ] 最终确认项目可编译、可安装、可演示。
-- [ ] 提交完整源代码到指定平台。
+> 依据上游仓库 `MarchSeventh258/totem_mobile` 的最新版 `实验任务书.md`（提交 `6eb1f54`）整理。
+
+## 0. 开发准备
+
+- [x] 使用 Android Studio 打开当前项目并完成 Gradle 同步。
+- [x] 确认 Android SDK、JDK 和 Gradle 环境可用。
+- [x] 在 Android 模拟器或 Android 真机上成功编译、安装并启动原始应用。
+- [x] 确认 `MainActivity.java` 的 SQL 输入框和结果展示区域能够正常工作。
+- [x] 运行现有基础 SQL，确认修改前的 `CREATE CLASS`、`INSERT`、`SELECT`、`UPDATE`、`DELETE` 可用。
+- [x] 阅读 `CreateDeputyClassImpl.java`，定位 SelectDeputy 和 GroupDeputy 的创建逻辑。
+- [x] 阅读 `InsertImpl.java`，定位源元组插入、代理传播和 `BiPointer` 创建逻辑。
+- [x] 阅读 `DeleteImpl.java`，定位源元组及代理元组删除迁移逻辑。
+- [x] 阅读 `UpdateImpl.java`，定位源元组及代理元组更新迁移逻辑。
+- [x] 阅读 `SelectImpl.java`、`GroupBy.java` 和 `Having.java`，确认查询执行阶段与数据结构。
+- [x] 阅读代理类系统表，确认 `DeputyTable`、`DeputyRuleTable`、`SwitchingTable`、`BiPointerTable` 的用途。
+
+## 1. 非严格 SelectDeputy
+
+### 1.1 创建与模式识别
+
+- [x] 创建 SelectDeputy 时检查其 `SELECT` 是否包含 `WHERE` 子句。
+- [x] 将包含 `WHERE` 的 SelectDeputy 识别为严格模式。
+- [x] 将不包含 `WHERE` 的 SelectDeputy 识别为非严格模式。
+- [x] 选择合适的系统表字段或规则表示方式，持久化严格/非严格模式信息。
+- [x] 确保数据库重新加载后仍能正确识别代理类模式。
+- [x] 创建非严格 SelectDeputy 时建立类定义和属性映射。
+- [x] 创建非严格 SelectDeputy 时不复制源类已有数据，代理类初始为空。
+- [x] 保持严格 SelectDeputy 创建时按 `WHERE` 自动筛选数据的现有行为。
+
+### 1.2 显式 INSERT
+
+- [x] 确认解析器可以解析 `INSERT INTO source VALUES (...) INTO deputyClass`。
+- [x] 在 `InsertImpl.java` 中读取可选的目标代理类名称。
+- [x] 未指定第二个 `INTO` 时，只向源类插入元组。
+- [x] 未指定第二个 `INTO` 时，不向任何非严格 SelectDeputy 自动传播。
+- [x] 指定第二个 `INTO` 时，先完成源元组插入。
+- [x] 校验目标代理类存在。
+- [x] 校验目标类是 SelectDeputy。
+- [x] 校验目标代理类的源类与当前插入的源类一致。
+- [x] 校验目标代理类为非严格模式。
+- [x] 对严格 SelectDeputy 使用显式 `INTO` 时返回明确错误。
+- [x] 对非同源代理类使用显式 `INTO` 时返回明确错误。
+- [x] 根据 `SwitchingTable` 将源元组属性映射到代理元组属性。
+- [x] 将映射后的元组插入指定非严格 SelectDeputy。
+- [x] 为源元组和代理元组创建正确的双向指针。
+- [x] 确保插入失败时不会遗留半完成的代理元组或双向指针。
+- [x] 保持严格 SelectDeputy 原有的规则驱动插入行为不变。
+
+### 1.3 DELETE 更新迁移
+
+- [x] 删除源元组前查找其关联的非严格 SelectDeputy 指针。
+- [x] 删除关联源元组时同步删除对应代理元组。
+- [x] 同步清理源元组与代理元组之间的 `BiPointer` 条目。
+- [x] 删除未关联非严格代理类的源元组时，不修改代理类数据。
+- [x] 确保严格 SelectDeputy 的删除迁移行为不受影响。
+
+### 1.4 UPDATE 更新迁移
+
+- [x] 更新源元组时查找其关联的非严格 SelectDeputy 指针。
+- [x] 根据 `SwitchingTable` 找出需要同步的代理属性。
+- [x] 更新关联源元组时同步更新代理元组的对应属性值。
+- [x] 更新未关联非严格代理类的源元组时，不修改代理类数据。
+- [x] 确保严格 SelectDeputy 的更新迁移行为不受影响。
+
+### 1.5 任务一验收
+
+- [x] 创建无 `WHERE` 的 `GoodStudent` 后确认代理类初始为空。
+- [x] 插入 Alice 时不指定代理类，确认 `GoodStudent` 只显示表头、没有数据行。
+- [x] 使用 `INTO GoodStudent` 插入 Bob，确认代理类结果为 `Bob | 85`。
+- [x] 创建有 `WHERE score > 80` 的严格代理类。
+- [x] 对严格代理类执行显式 `INTO`，确认操作报错。
+- [x] 从 `Teacher` 向 `Student` 的代理类显式插入，确认操作报错。
+- [x] 插入 Alice 和 Charlie 到非严格代理类，再删除 Alice，确认只剩 Charlie。
+- [x] 删除未关联代理类的 Bob，确认 Charlie 不受影响。
+- [x] 更新关联代理类的 Alice 分数为 95，确认代理元组同步为 `Alice | 95`。
+- [x] 更新未关联代理类的 Bob，确认代理类仍为 `Alice | 95`。
+
+## 2. GroupDeputy HAVING
+
+### 2.1 HAVING 表达式执行
+
+- [x] 实现 `Having.java`，使其能够接收并执行任务书中的 HAVING 条件。
+- [x] 复用现有表达式或 `WHERE` 比较能力，避免重复实现相同运算逻辑。
+- [x] 支持对分组后的聚合结果执行比较。
+- [x] 至少支持任务书使用的 `AVG(column)`。
+- [x] 至少支持任务书使用的 `>` 和 `>=` 比较运算符。
+- [x] 正确处理整数和平均值等数值类型比较。
+- [x] 对不支持或非法的 HAVING 表达式返回明确错误。
+
+### 2.2 普通 SELECT 中的 HAVING
+
+- [x] 在 `SelectImpl.java` 中接入 HAVING 过滤。
+- [x] 确保 HAVING 在 `GROUP BY` 聚合完成后执行。
+- [x] 确保 HAVING 在 `ORDER BY` 排序前执行。
+- [x] 确保没有 HAVING 的原有 `GROUP BY` 查询行为不变。
+- [x] 执行 `HAVING AVG(salary) > 5000`，确认 Sales 被过滤，HR 和 IT 保留。
+- [x] 执行 `HAVING AVG(salary) >= 3000`，确认 HR、IT、Sales 三个部门都保留。
+
+### 2.3 创建 GroupDeputy
+
+- [x] 创建 GroupDeputy 时解析并保存完整的 HAVING 规则。
+- [x] 在创建代理元组前对分组结果执行 HAVING 过滤。
+- [x] 只向 GroupDeputy 插入满足 HAVING 的分组。
+- [x] 只为满足 HAVING 的分组创建对应 `BiPointer` 条目。
+- [x] 不为被 HAVING 过滤的分组创建代理元组或指针。
+- [x] 确保没有 HAVING 的 GroupDeputy 创建行为保持不变。
+- [x] 使用 `HAVING AVG(salary) > 5000` 创建 `HighSalaryDept`。
+- [x] 查询 `HighSalaryDept`，确认只有 HR 和 IT，不包含 Sales。
+
+### 2.4 INSERT 更新迁移
+
+- [x] 源类插入数据后确定受影响的分组。
+- [x] 重新计算受影响分组的 `AVG`、`COUNT` 等代理属性。
+- [x] 分组始终满足 HAVING 时，更新已有代理元组的聚合值。
+- [x] 分组由不满足变为满足 HAVING 时，创建代理元组。
+- [x] 新建代理元组时同步创建正确的 `BiPointer` 条目。
+- [x] 分组仍不满足 HAVING 时，不创建代理元组。
+- [x] 向 IT 插入工资 10000 的员工，确认 `avg_sal` 更新为 9000、`cnt` 更新为 3。
+- [x] 向 Sales 插入工资 9000 的员工，确认平均值变为 6000 并出现 Sales 代理元组。
+
+### 2.5 DELETE 更新迁移
+
+- [x] 源类删除数据后确定受影响的分组。
+- [x] 重新计算受影响分组的聚合属性。
+- [x] 删除后分组仍满足 HAVING 时，更新已有代理元组。
+- [x] 删除后分组不再满足 HAVING 时，删除对应代理元组。
+- [x] 删除代理元组时同步清理相关 `BiPointer` 条目。
+- [x] 分组删除至无源元组时，删除对应代理元组和所有相关指针。
+- [x] 删除 IT 中 id=4 的员工，确认 IT 仍存在且聚合值、计数更新。
+- [x] 删除 Sales 中新增的高工资员工，确认平均值降低后 Sales 代理元组消失。
+
+### 2.6 UPDATE 更新迁移
+
+- [x] 源类更新数据后确定更新前和更新后的受影响分组。
+- [x] 分组键未变化时重新计算该分组聚合属性。
+- [x] 分组键变化时分别重新计算旧分组和新分组。
+- [x] 更新后分组始终满足 HAVING 时，更新已有代理元组。
+- [x] 更新后分组由满足变为不满足 HAVING 时，删除代理元组和相关指针。
+- [x] 更新后分组由不满足变为满足 HAVING 时，创建代理元组和相关指针。
+- [x] 更新工资后确认持续满足的分组聚合值会更新。
+- [x] 将 HR 的 id=2 工资更新为 3000，确认平均值变为 4000 后 HR 消失。
+- [x] 将 HR 两名员工工资更新为 9000，确认 HR 平均值变为 9000 后重新出现。
+
+### 2.7 任务二回归与边界
+
+- [x] 验证 HAVING 阈值等于边界时 `>=` 能正确保留分组。
+- [x] 验证 HAVING 阈值等于边界时 `>` 能正确过滤分组。
+- [x] 验证一个分组只有一条源元组时聚合与 HAVING 判断正确。
+- [x] 验证删除一个分组最后一条源元组时不会遗留代理数据。
+- [x] 验证一次操作影响多个源元组时，每个分组只产生正确的最终代理状态。
+- [x] 验证 GroupDeputy 的代理元组与 `BiPointer` 始终一致。
+- [x] 回归无 HAVING 的普通 `GROUP BY` 查询。
+- [x] 回归无 HAVING 的 GroupDeputy 创建与更新迁移。
+
+## 3. Android 演示与交付
+
+- [x] 在 Android Studio 中成功编译项目。
+- [x] 将应用安装到 Android 模拟器或 Android 真机。
+- [x] 在 Android 前端依次执行任务一的全部任务书示例。
+- [x] 在 Android 前端依次执行任务二的全部任务书示例。
+- [x] 确认 SQL 查询结果在界面中完整、清晰地显示。
+- [x] 确认非法显式代理插入在界面中显示明确错误。
+- [x] 保存任务一关键执行结果和截图。
+- [x] 保存任务二关键执行结果和截图。
+- [x] 整理任务一的设计思路、修改文件和核心代码。
+- [x] 整理任务二的设计思路、修改文件和核心代码。
+- [x] 在实验报告中说明 AI 工具的使用方式和所占比重。
+- [x] 检查提交内容不包含 `references/`、`tmp/`、本地配置和构建产物。
+- [x] 最终确认任务书中的全部示例均通过。
+- [x] 提交完整项目源码和实验报告。

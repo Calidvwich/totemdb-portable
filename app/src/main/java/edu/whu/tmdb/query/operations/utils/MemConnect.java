@@ -478,6 +478,7 @@ public class MemConnect {
             memManager.loadClassTable();
             memManager.loadAttributeTable();
             memManager.loadDeputyTable();
+            memManager.loadDeputyRuleTable();
             memManager.loadBiPointerTable();
             memManager.loadSwitchingTable();
         }catch (IOException e){

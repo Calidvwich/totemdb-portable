@@ -186,8 +186,8 @@ public class UpdateImpl implements Update {
             for (BiPointerTableItem biPointerTableItem : biPointerTableList) {
                 if (biPointerTableItem.objectid == tuple.tupleId) {
                     // 将group代理的单独列出
-                    if (getdeputyrule(biPointerTableItem.deputyid, 1) == "groupdeputy") {
-                        groupDeputyTupleIdSet.add(biPointerTableItem.deputyobjectid);
+                    if ("groupdeputy".equals(getdeputyrule(biPointerTableItem.deputyid, 1))) {
+                        continue;
                     }
                 }
             }
@@ -198,13 +198,19 @@ public class UpdateImpl implements Update {
         TupleList deputyTupleList = new TupleList();    // 所有代理类的元组
         for (BiPointerTableItem biPointerTableItem : MemConnect.getBiPointerTableList()) {
             if (updateIdList.contains(biPointerTableItem.objectid)) {
+                if ("groupdeputy".equals(getdeputyrule(biPointerTableItem.deputyid, 1))) {
+                    continue;
+                }
                 deputyTupleIdList.add(biPointerTableItem.deputyobjectid);
                 Tuple tuple = memConnect.GetTuple(biPointerTableItem.deputyobjectid);
                 deputyset.add(biPointerTableItem.deputyid);
                 deputyTupleList.addTuple(tuple);
             }
         }
-        if (deputyTupleIdList.isEmpty()) { return; }
+        if (deputyTupleIdList.isEmpty()) {
+            new GroupDeputySynchronizer().synchronizeForSource(classId);
+            return;
+        }
 
         // 3.获取deputyTupleId->...的哈希映射列表 
         //   判断修改列是否为join连接条件 by zmjk
@@ -219,7 +225,7 @@ public class UpdateImpl implements Update {
                     deputyId2AttrId.put(switchingTableItem.deputyId, new ArrayList<>());
                     deputyId2UpdateValue.put(switchingTableItem.deputyId, new ArrayList<>());
                 }
-                if(switchingTableItem.rule=="joindeputy"){
+                if ("joindeputy".equals(switchingTableItem.rule)) {
                     ArrayList<String> joinColumns = extractColumnNames(getdeputyrule(switchingTableItem.deputyId,2));
                     String oriAttrName = memConnect.getColumn(switchingTableItem.oriId, switchingTableItem.oriAttrid);
                     if(joinColumns.contains(oriAttrName)){
@@ -333,6 +339,9 @@ public class UpdateImpl implements Update {
                 break;
                 default:
                 {
+                    if (!deputyId2AttrId.containsKey(deputyId)) {
+                        break;
+                    }
                     TupleList updateTupleList = new TupleList();
                     for (Tuple tuple : deputyTupleList.tuplelist) {
                         if (tuple.classId == deputyId) {
@@ -507,6 +516,7 @@ public class UpdateImpl implements Update {
             
             }
         }
+        new GroupDeputySynchronizer().synchronizeForSource(classId);
     }
 
     // 把新tuple的内容给旧tuple，oid继续沿用旧的

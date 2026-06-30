@@ -51,14 +51,107 @@ public class InsertImpl implements Insert {
             }
         }
 
+        Table deputyTable = insertStmt.getDeputyTable();
+        Integer explicitDeputyId = null;
+        int sourceClassId = memConnect.getClassId(table.getName());
+        if (deputyTable != null) {
+            explicitDeputyId = validateExplicitDeputy(sourceClassId, deputyTable.getName());
+        }
+
         // 对应含有子查询的插入语句
         SelectImpl select = new SelectImpl();
         SelectResult selectResult = select.select(insertStmt.getSelect());
 
         // tuplelist存储需要插入的tuple部分
         TupleList tupleList = selectResult.getTpl();
-        execute(table.getName(), attrNames, tupleList);
+        if (explicitDeputyId == null) {
+            execute(table.getName(), attrNames, tupleList);
+        } else {
+            executeWithExplicitDeputy(sourceClassId, attrNames, tupleList, explicitDeputyId);
+        }
         return tupleIdList;
+    }
+
+    private int validateExplicitDeputy(int sourceClassId, String deputyClassName) throws TMDBException {
+        if (!memConnect.classExist(deputyClassName)) {
+            throw new IllegalArgumentException("deputy class " + deputyClassName + " does not exist");
+        }
+
+        int deputyClassId = memConnect.getClassId(deputyClassName);
+        DeputyTableItem relation = null;
+        for (DeputyTableItem item : MemConnect.getDeputyTableList()) {
+            if (item.originid == sourceClassId && item.deputyid == deputyClassId) {
+                relation = item;
+                break;
+            }
+        }
+        if (relation == null || !"selectdeputy".equals(getDeputyRule(relation.ruleid, 1))) {
+            throw new IllegalArgumentException(
+                deputyClassName + " is not a non-strict deputy of the source class"
+            );
+        }
+
+        String mode = getDeputyRule(relation.ruleid, 2);
+        if (CreateDeputyClassImpl.SELECT_DEPUTY_STRICT_MODE.equals(mode)) {
+            throw new IllegalArgumentException(
+                "explicit INTO is not allowed for strict deputy " + deputyClassName
+            );
+        }
+        if (!CreateDeputyClassImpl.SELECT_DEPUTY_NON_STRICT_MODE.equals(mode)) {
+            throw new IllegalArgumentException(
+                deputyClassName + " is not a non-strict deputy of the source class"
+            );
+        }
+        return deputyClassId;
+    }
+
+    private void executeWithExplicitDeputy(
+        int sourceClassId,
+        List<String> columns,
+        TupleList tupleList,
+        int deputyClassId
+    ) throws TMDBException, IOException {
+        int attrNum = memConnect.getClassAttrnum(sourceClassId);
+        int[] attrIdList = memConnect.getAttridList(sourceClassId, columns);
+        for (Tuple tuple : tupleList.tuplelist) {
+            if (tuple.tuple.length != columns.size()) {
+                throw new TMDBException();
+            }
+            int sourceTupleId = insertOne(sourceClassId, columns, tuple, attrNum, attrIdList);
+            int deputyTupleId = insertExplicitDeputyTuple(sourceClassId, tuple, deputyClassId);
+            MemConnect.getBiPointerTableList().add(
+                new BiPointerTableItem(sourceClassId, sourceTupleId, deputyClassId, deputyTupleId)
+            );
+        }
+    }
+
+    private int insertExplicitDeputyTuple(int sourceClassId, Tuple sourceTuple, int deputyClassId)
+        throws TMDBException, IOException {
+        List<SwitchingTableItem> mappings = new ArrayList<>();
+        for (SwitchingTableItem item : MemConnect.getSwitchingTableList()) {
+            if (item.oriId == sourceClassId && item.deputyId == deputyClassId) {
+                mappings.add(item);
+            }
+        }
+        mappings.sort((left, right) -> Integer.compare(left.deputyAttrId, right.deputyAttrId));
+
+        List<String> deputyColumns = new ArrayList<>();
+        Object[] deputyValues = new Object[mappings.size()];
+        for (int i = 0; i < mappings.size(); i++) {
+            SwitchingTableItem mapping = mappings.get(i);
+            deputyColumns.add(mapping.deputyAttr);
+            deputyValues[i] = sourceTuple.tuple[mapping.oriAttrid];
+        }
+        return executeOne(deputyClassId, deputyColumns, new Tuple(deputyValues));
+    }
+
+    private static String getDeputyRule(int ruleId, int index) {
+        for (DeputyRuleTableItem item : MemConnect.getDeputyRuleTableList()) {
+            if (item.ruleid == ruleId && item.deputyrule.length > index) {
+                return item.deputyrule[index];
+            }
+        }
+        return "";
     }
 
     /**
@@ -246,6 +339,9 @@ public class InsertImpl implements Insert {
         // 2.2 将元组转换为代理类应有的形式
         if (!DeputyIdList.isEmpty()) {
             for (int deputyClassId : DeputyIdList) {
+                if (CreateDeputyClassImpl.SELECT_DEPUTY_NON_STRICT_MODE.equals(getdeputyrule(deputyClassId, 2))) {
+                    continue;
+                }
                 String stmt = getdeputyrule(deputyClassId,0);
                 Transaction transaction = Transaction.getInstance();    // 创建一个事务实例
                 SelectResult selectResult = null;
@@ -289,60 +385,7 @@ public class InsertImpl implements Insert {
                     }
                 }
                 else if (Objects.equals(deputyquery(classId, deputyClassId), "groupdeputy")) {
-                    // 获得分组依据，聚合函数名以及聚合值的索引下标
-                    String groupAttr = getDeputyAttr(classId, deputyClassId);
-                    int groupAttrIdx = memConnect.getAttrid(classId, groupAttr);
-                    Object groupObj = temp[groupAttrIdx];
-                    ArrayList<String> funcNames = new ArrayList<>();
-                    ArrayList<Integer> pIndexs = new ArrayList<>();
-                    for (SwitchingTableItem sti : MemConnect.getSwitchingTableList()) {
-                        if(classId == sti.oriId && deputyClassId == sti.deputyId) {
-                            if(!Objects.equals(sti.oriAttr, sti.deputyAttr)) { // 聚合列的源列名是不带聚合函数的，代理列名是带聚合函数的
-                                funcNames.add(sti.rule);
-                                pIndexs.add(memConnect.getAttrid(classId, sti.oriAttr));
-                            }
-                        }
-                    }
-
-                    // 执行对分组依据的查询（如果有索引，那么效率为log复杂度）
-                    try {
-                        String sql = "select * from " + memConnect.getClassName(classId) + " where " + groupAttr + " = " + groupObj.toString() + ";";
-                        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(sql.getBytes());
-                        Statement selectstmt = CCJSqlParserUtil.parse(byteArrayInputStream);
-                        selectResult = transaction.query("", -1, selectstmt);
-                    }catch (JSQLParserException e) {
-                        System.out.println("syntax error");
-                    }
-                    TupleList changedList = selectResult.getTpl();
-
-                    // 在这里已经得到了resultMap中的obg, list<tuple>，也就是groupobj和changedlist.tpl，再次对这些进行分组计算
-                    SelectImpl selecttemp = new SelectImpl();
-                    Tuple t = selecttemp.aggOne(groupObj, changedList, funcNames, pIndexs);
-
-                    // 插入新的分组
-                    if(changedList.tuplenum == 1) {
-                        // 直接插入一条新记录，然后更新双指针表
-                        int inserttupleid= executeOne(deputyClassId, memConnect.getColumns(deputyname), t);
-                        MemConnect.getBiPointerTableList().add(new BiPointerTableItem(classId, tupleid, deputyClassId, inserttupleid));
-                    }
-                    // 插入已有的分组
-                    else {
-                        // 找到分组依据的代理对象id
-                        TupleList oldDeputyTpl = memConnect.getTupleList(deputyClassId);
-                        int groupObjDptId = -1;
-                        Tuple oldt = null;
-                        for(Tuple tempt : oldDeputyTpl.tuplelist) {
-                            if(Objects.equals(tempt.tuple[0], groupObj)) {
-                                groupObjDptId = tempt.tupleId;
-                                oldt = tempt;
-                            }
-                        }
-                        // 把新聚合结果给旧tuple
-                        UpdateImpl updatetemp = new UpdateImpl();
-                        updatetemp.updateOne(oldt, t);
-                        // 插入双指针表
-                        MemConnect.getBiPointerTableList().add(new BiPointerTableItem(classId, tupleid, deputyClassId, groupObjDptId));
-                    }
+                    new GroupDeputySynchronizer().synchronizeForSource(classId);
                 }
                 else {
                     try {

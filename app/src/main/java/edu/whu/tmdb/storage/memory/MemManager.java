@@ -94,6 +94,7 @@ public class MemManager {
 
         try {
             loadDeputyTable();
+            loadDeputyRuleTable();
             loadSwitchingTable();
             loadClassTable();
             loadAttributeTable();
@@ -122,6 +123,7 @@ public class MemManager {
         try{
             saveSwitchingTable();
             saveDeputyTable();
+            saveDeputyRuleTable();
             saveClassTable();
             saveAttributeTable();
             saveBiPointerTable();
