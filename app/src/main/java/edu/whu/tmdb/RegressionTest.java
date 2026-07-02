@@ -32,6 +32,7 @@ public class RegressionTest {
         testAggregateFunctions();
         testGroupBy();
         testHaving();
+        testHavingHiddenAggregateExpressions();
         testGroupDeputyHavingCreation();
         testGroupDeputyHavingMigration();
         testGroupDeputyHavingBoundaries();
@@ -46,6 +47,7 @@ public class RegressionTest {
         testCrossClassQuery();
         testUpdateMigration();
         testNonStrictSelectDeputyCreation();
+        testNonStrictExplicitInsertColumnOrder();
 
         System.out.println("========================================");
         System.out.println("  " + passed + " passed, " + failed + " failed");
@@ -183,6 +185,49 @@ public class RegressionTest {
             "Employee\n" +
             "|dept                |AVG(salary)         |\n" +
             "|IT                  |8500.00             |\n");
+    }
+
+    static void testHavingHiddenAggregateExpressions() {
+        section("HAVING hidden aggregate expressions");
+        ddl("CREATE CLASS HiddenEmployee (id INT, dept STRING, salary INT);");
+        ddl("INSERT INTO HiddenEmployee VALUES " +
+            "(1, 'HR', 5000), (2, 'HR', 6000), " +
+            "(3, 'IT', 8000), (4, 'IT', 9000), " +
+            "(5, 'Sales', 3000);");
+
+        check("SELECT dept FROM HiddenEmployee " +
+                "GROUP BY dept HAVING AVG(salary) > 5500 ORDER BY dept;",
+            "HiddenEmployee\n" +
+            "|dept                |\n" +
+            "|IT                  |\n");
+
+        check("SELECT dept FROM HiddenEmployee " +
+                "GROUP BY dept HAVING COUNT(*) >= 2 ORDER BY dept;",
+            "HiddenEmployee\n" +
+            "|dept                |\n" +
+            "|HR                  |\n" +
+            "|IT                  |\n");
+
+        createDeputy("CREATE GROUPDEPUTY HiddenHighDept AS " +
+            "SELECT dept FROM HiddenEmployee GROUP BY dept HAVING AVG(salary) > 5500;");
+        check("SELECT * FROM HiddenHighDept ORDER BY dept;",
+            "HiddenHighDept\n" +
+            "|dept                |\n" +
+            "|IT                  |\n");
+        checkBiPointer("HiddenEmployee", 3, "HiddenHighDept");
+        checkBiPointer("HiddenEmployee", 4, "HiddenHighDept");
+        checkBiPointerCount("HiddenEmployee", "HiddenHighDept", 2);
+
+        ddl("INSERT INTO HiddenEmployee VALUES (6, 'Sales', 9000);");
+        check("SELECT * FROM HiddenHighDept ORDER BY dept;",
+            "HiddenHighDept\n" +
+            "|dept                |\n" +
+            "|IT                  |\n" +
+            "|Sales               |\n");
+        checkBiPointer("HiddenEmployee", 5, "HiddenHighDept");
+        checkBiPointer("HiddenEmployee", 6, "HiddenHighDept");
+        checkBiPointerCount("HiddenEmployee", "HiddenHighDept", 4);
+        checkGroupDeputyConsistency("HiddenEmployee", "HiddenHighDept");
     }
 
     static void testGroupDeputyHavingCreation() {
@@ -541,6 +586,23 @@ public class RegressionTest {
             "ManualStudent\n" +
             "|name                |score               |\n" +
             "|Charlie             |95                  |\n");
+    }
+
+    static void testNonStrictExplicitInsertColumnOrder() {
+        section("SelectDeputy (non-strict explicit insert column order)");
+        ddl("CREATE CLASS ColumnOrderStudent (id INT, name STRING, score INT);");
+        ddl("CREATE SELECTDEPUTY ColumnOrderManual AS SELECT name, score FROM ColumnOrderStudent;");
+        ddl("INSERT INTO ColumnOrderStudent(name, score, id) VALUES ('Alice', 90, 1) INTO ColumnOrderManual;");
+
+        check("SELECT * FROM ColumnOrderStudent;",
+            "ColumnOrderStudent\n" +
+            "|id                  |name                |score               |\n" +
+            "|1                   |Alice               |90                  |\n");
+        check("SELECT * FROM ColumnOrderManual;",
+            "ColumnOrderManual\n" +
+            "|name                |score               |\n" +
+            "|Alice               |90                  |\n");
+        checkBiPointer("ColumnOrderStudent", 1, "ColumnOrderManual");
     }
 
     // ==================== JoinDeputy ====================

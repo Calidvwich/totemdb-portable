@@ -21,10 +21,12 @@ import edu.whu.tmdb.storage.memory.MemManager;
 import edu.whu.tmdb.storage.memory.Tuple;
 import edu.whu.tmdb.storage.memory.TupleList;
 import edu.whu.tmdb.storage.memory.SystemTable.AttributeTableItem;
+import net.sf.jsqlparser.expression.BinaryExpression;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.Function;
 import net.sf.jsqlparser.expression.Parenthesis;
 import net.sf.jsqlparser.expression.RowConstructor;
+import net.sf.jsqlparser.expression.SignedExpression;
 import net.sf.jsqlparser.expression.StringValue;
 import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -126,10 +128,15 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
             Where where = new Where();
             selectResult = where.where(plainSelect, selectResult);
         }
+        int visibleSelectItemCount = -1;
+        boolean hasHiddenSelectItems = false;
         if(plainSelect.getGroupBy() != null){
             GroupBy groupBy = new GroupBy();
             HashMap<Object, ArrayList<Tuple>> hashMap = groupBy.groupBy(plainSelect, selectResult);
-            selectResult = groupByElicit(plainSelect, hashMap, selectResult);
+            visibleSelectItemCount = plainSelect.getSelectItems().size();
+            ArrayList<SelectItem> selectItems = withHiddenHavingAggregates(plainSelect);
+            hasHiddenSelectItems = selectItems.size() > visibleSelectItemCount;
+            selectResult = groupByElicit(plainSelect, selectItems, hashMap, selectResult);
             if (plainSelect.getHaving() != null) {
                 Having having = new Having();
                 selectResult = having.having(plainSelect, selectResult);
@@ -144,6 +151,9 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
         }
         if (plainSelect.getLimit() != null){
             selectResult = limit(Integer.parseInt(plainSelect.getLimit().getRowCount().toString()), selectResult);
+        }
+        if (hasHiddenSelectItems) {
+            selectResult = trimHiddenSelectItems(selectResult, visibleSelectItemCount);
         }
         //最终返回selectResult
         return selectResult;
@@ -168,10 +178,15 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
             Where where = new Where();
             selectResult = where.where(plainSelect, selectResult);
         }
+        int visibleSelectItemCount = -1;
+        boolean hasHiddenSelectItems = false;
         if(plainSelect.getGroupBy() != null){
             GroupBy groupBy = new GroupBy();
             HashMap<Object, ArrayList<Tuple>> hashMap = groupBy.groupBy(plainSelect, selectResult);
-            selectResult = groupByElicit(plainSelect, hashMap, selectResult);
+            visibleSelectItemCount = plainSelect.getSelectItems().size();
+            ArrayList<SelectItem> selectItems = withHiddenHavingAggregates(plainSelect);
+            hasHiddenSelectItems = selectItems.size() > visibleSelectItemCount;
+            selectResult = groupByElicit(plainSelect, selectItems, hashMap, selectResult);
             if (plainSelect.getHaving() != null) {
                 Having having = new Having();
                 selectResult = having.having(plainSelect, selectResult);
@@ -188,6 +203,9 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
             selectResult = limit(Integer.parseInt(plainSelect.getLimit().getRowCount().toString()), selectResult);
         }
         //最终返回selectResult
+        if (hasHiddenSelectItems) {
+            selectResult = trimHiddenSelectItems(selectResult, visibleSelectItemCount);
+        }
         return selectResult;
     }
     private SelectResult limit(int limit, SelectResult selectResult) {
@@ -209,10 +227,123 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
         return selectResult;
     }
 
+    private ArrayList<SelectItem> withHiddenHavingAggregates(PlainSelect plainSelect) {
+        ArrayList<SelectItem> selectItems = new ArrayList<>(plainSelect.getSelectItems());
+        if (plainSelect.getHaving() == null) {
+            return selectItems;
+        }
+
+        HashSet<String> visibleExpressions = new HashSet<>();
+        for (SelectItem item : selectItems) {
+            if (item instanceof SelectExpressionItem) {
+                visibleExpressions.add(
+                    ((SelectExpressionItem) item).getExpression().toString().toLowerCase()
+                );
+            }
+        }
+
+        ArrayList<Function> havingAggregates = new ArrayList<>();
+        collectAggregateFunctions(plainSelect.getHaving(), havingAggregates);
+        for (Function function : havingAggregates) {
+            String expressionText = function.toString().toLowerCase();
+            if (!visibleExpressions.contains(expressionText)) {
+                selectItems.add(new SelectExpressionItem(function));
+                visibleExpressions.add(expressionText);
+            }
+        }
+        return selectItems;
+    }
+
+    private void collectAggregateFunctions(Expression expression, ArrayList<Function> functions) {
+        if (expression == null) {
+            return;
+        }
+        if (expression instanceof Function) {
+            Function function = (Function) expression;
+            if (isSupportedAggregateFunction(function)) {
+                functions.add(function);
+                return;
+            }
+            if (function.getParameters() != null) {
+                for (Expression parameter : function.getParameters().getExpressions()) {
+                    collectAggregateFunctions(parameter, functions);
+                }
+            }
+            return;
+        }
+        if (expression instanceof Parenthesis) {
+            collectAggregateFunctions(((Parenthesis) expression).getExpression(), functions);
+            return;
+        }
+        if (expression instanceof SignedExpression) {
+            collectAggregateFunctions(((SignedExpression) expression).getExpression(), functions);
+            return;
+        }
+        if (expression instanceof BinaryExpression) {
+            BinaryExpression binary = (BinaryExpression) expression;
+            collectAggregateFunctions(binary.getLeftExpression(), functions);
+            collectAggregateFunctions(binary.getRightExpression(), functions);
+        }
+    }
+
+    private boolean isSupportedAggregateFunction(Function function) {
+        if (function.getName() == null) {
+            return false;
+        }
+        switch (function.getName().toLowerCase()) {
+            case "avg":
+            case "count":
+            case "sum":
+            case "min":
+            case "max":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private SelectResult trimHiddenSelectItems(SelectResult selectResult, int visibleColumnCount) {
+        if (visibleColumnCount < 0 || selectResult.getAttrname().length <= visibleColumnCount) {
+            return selectResult;
+        }
+
+        SelectResult trimmed = new SelectResult();
+        trimmed.setAlias(Arrays.copyOf(selectResult.getAlias(), visibleColumnCount));
+        trimmed.setAttrname(Arrays.copyOf(selectResult.getAttrname(), visibleColumnCount));
+        trimmed.setClassName(Arrays.copyOf(selectResult.getClassName(), visibleColumnCount));
+        trimmed.setAttrid(Arrays.copyOf(selectResult.getAttrid(), visibleColumnCount));
+        trimmed.setType(Arrays.copyOf(selectResult.getType(), visibleColumnCount));
+        trimmed.setGroupMap(selectResult.getGroupMap());
+        if (selectResult.getisUnion()) {
+            trimmed.setisUnion();
+        }
+        if (selectResult.getisJoin()) {
+            trimmed.setisJoin(selectResult.getJoinColumnNames());
+        }
+        trimmed.aliasMapping.putAll(selectResult.aliasMapping);
+
+        TupleList trimmedTpl = new TupleList();
+        for (Tuple tuple : selectResult.getTpl().tuplelist) {
+            Object[] values = Arrays.copyOf(tuple.tuple, visibleColumnCount);
+            int[] tupleIds = tuple.tupleIds == null
+                ? null
+                : Arrays.copyOf(tuple.tupleIds, visibleColumnCount);
+            trimmedTpl.addTuple(new Tuple(
+                visibleColumnCount,
+                tuple.tupleId,
+                tuple.classId,
+                tupleIds,
+                values,
+                tuple.delete
+            ));
+        }
+        trimmed.setTpl(trimmedTpl);
+        return trimmed;
+    }
+
     @SuppressWarnings("unchecked")
-    private SelectResult groupByElicit(PlainSelect plainSelect, HashMap<Object, ArrayList<Tuple>> resultMap, SelectResult selectResult) throws TMDBException {
+    private SelectResult groupByElicit(PlainSelect plainSelect, ArrayList<SelectItem> selectItemList, HashMap<Object, ArrayList<Tuple>> resultMap, SelectResult selectResult) throws TMDBException {
         String groupByElement = plainSelect.getGroupBy().getGroupByExpressionList().getExpressions().get(0).toString();
-        ArrayList<SelectItem> selectItemList= (ArrayList<SelectItem>) plainSelect.getSelectItems();
         HashMap<SelectItem, ArrayList<Column>> map = getSelectItemColumn(selectItemList);
         //select item的length
         int length=selectItemList.size();
@@ -416,6 +547,35 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
             res.tuple[idx + 1] = d;
         }
         return res;
+    }
+
+    private void collectColumnsFromExpression(Expression expression, ArrayList<Column> columns) {
+        if (expression == null) {
+            return;
+        }
+        if (expression instanceof Column) {
+            columns.add((Column) expression);
+            return;
+        }
+        if (expression instanceof Parenthesis) {
+            collectColumnsFromExpression(((Parenthesis) expression).getExpression(), columns);
+            return;
+        }
+        if (expression instanceof SignedExpression) {
+            collectColumnsFromExpression(((SignedExpression) expression).getExpression(), columns);
+            return;
+        }
+        if (expression instanceof BinaryExpression) {
+            BinaryExpression binary = (BinaryExpression) expression;
+            collectColumnsFromExpression(binary.getLeftExpression(), columns);
+            collectColumnsFromExpression(binary.getRightExpression(), columns);
+            return;
+        }
+        if (expression instanceof Function && ((Function) expression).getParameters() != null) {
+            for (Expression parameter : ((Function) expression).getParameters().getExpressions()) {
+                collectColumnsFromExpression(parameter, columns);
+            }
+        }
     }
 
     /**
@@ -1305,7 +1465,11 @@ public class SelectImpl implements edu.whu.tmdb.query.operations.Select {
         HashMap<SelectItem, ArrayList<Column>> res = new HashMap<>();
         for (SelectItem selectItem : selectItemArrayList) {
             ArrayList<Column> columns = new ArrayList<>();
-            getSelectColumn((SimpleNode) selectItem.getASTNode(), columns);
+            if (selectItem.getASTNode() != null) {
+                getSelectColumn((SimpleNode) selectItem.getASTNode(), columns);
+            } else if (selectItem instanceof SelectExpressionItem) {
+                collectColumnsFromExpression(((SelectExpressionItem) selectItem).getExpression(), columns);
+            }
             res.put(selectItem,columns);
         }
         return res;
