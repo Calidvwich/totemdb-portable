@@ -21,7 +21,7 @@
         android:layout_marginTop="68dp"
         android:layout_marginBottom="12dp"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/btnBar"
+        app:layout_constraintBottom_toTopOf="@id/helperBar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -44,6 +44,67 @@
             </HorizontalScrollView>
         </ScrollView>
     </com.google.android.material.card.MaterialCardView>
+
+    <!-- 演示辅助按钮 -->
+    <LinearLayout
+        android:id="@+id/helperBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="6dp"
+        app:layout_constraintBottom_toTopOf="@id/btnBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btHistory"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:text="历史"
+            android:textSize="13sp"
+            app:cornerRadius="8dp"
+            android:layout_marginEnd="4dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btTask1"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:text="任务一"
+            android:textSize="13sp"
+            app:cornerRadius="8dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btTask2"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:text="任务二"
+            android:textSize="13sp"
+            app:cornerRadius="8dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btExport"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:text="导出"
+            android:textSize="13sp"
+            app:cornerRadius="8dp"
+            android:layout_marginStart="4dp"/>
+    </LinearLayout>
 
     <!-- 按钮 + 输入栏 -->
     <LinearLayout

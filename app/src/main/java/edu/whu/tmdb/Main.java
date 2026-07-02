@@ -39,11 +39,14 @@ public class Main {
             return DbOperation.getSwitchingTableString();
         } else if (!sqlCommand.isEmpty()) {
             try {
+                CCJSqlParserUtil.parse(new ByteArrayInputStream(sqlCommand.getBytes()));
                 SelectResult result = execute(sqlCommand);
                 if (result != null) {
                     return DbOperation.getResultString(result);
                 }
                 else return "success";
+            } catch (JSQLParserException | net.sf.jsqlparser.parser.TokenMgrError e) {
+                return "Error: SQL syntax error";
             } catch (Exception e) {
                 e.printStackTrace();
                 return "Error: " + e.getMessage();  // 返回错误信息

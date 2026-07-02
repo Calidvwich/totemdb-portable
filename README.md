@@ -20,6 +20,36 @@ Totem 是一个运行在 Android 平台上的移动数据库系统，使用 Java
 - Android 模拟器或 Android 真机
 - Java / Gradle 项目环境
 
+## 快速启动
+
+Windows 命令行进入项目目录后，可以直接运行：
+
+```cmd
+start_app.bat
+```
+
+该脚本会自动设置本机 JDK/Android SDK 环境变量，编译 Debug APK；如果检测到已连接的 Android 模拟器或真机，会自动安装并启动应用。
+
+常用检查命令：
+
+```cmd
+run_checks.bat
+```
+
+该脚本会依次运行回归测试、极端输入测试，并编译 Debug APK。
+
+手动启动方式：
+
+```cmd
+cd /d E:\portable-totem
+set JAVA_HOME=C:\Users\Lenovo\.jdks\jdk-17.0.19+10
+set ANDROID_HOME=C:\Users\Lenovo\AppData\Local\Android\Sdk
+set ANDROID_SDK_ROOT=%ANDROID_HOME%
+gradlew.bat :app:assembleDebug
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+adb shell monkey -p edu.whu.tmdb 1
+```
+
 参考项目地址：
 
 ```text
